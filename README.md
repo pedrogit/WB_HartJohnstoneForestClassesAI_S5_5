@@ -1,38 +1,72 @@
 # WB_HartJohnstoneForestClassesAI_S5_5
 
-## Scheduling update (2026-11-03)
-
-Initial and recurring classification run at priority 8.5 after core growth and
-summary, at simulation start and each core succession boundary. `updateInterval = NA`
-follows the core timestep (10 years standalone); an explicit interval must match
-the core when coupled. Optional plots follow at 8.75 and saves at 9, with missing
-output intervals following the resolved classification interval. Output enablement
-and scientific rules remain unchanged. This supersedes older timing descriptions.
-
-A SpaDES module that converts the `cohortData` and `pixelGroupMap` of Biomass_core into a
-map of forest classes adapted from Table 1 of Hart et al. (2019). Biomass (`B`) is used as
-the proxy for tree species dominance. The drainage split of the spruce and non-forest
-states is not applied.
+Version **0.1.0** uses the same non-drainage parameters and six-class biomass rules as the
+original `WB_HartJohnstoneForestClasses` module and as `WB_HartJohnstoneForestClassesAI_Sol6_1`.
+It adapts Table 1 of Hart et al. (2019), with biomass replacing basal area and stem density.
+Agreement with the original is not ecological validation. No age, drainage or minimum-biomass
+rule is applied, and there is no drainage parameter, input or seventh class.
 
 ## Classes
 
-| Value | Class | Rule (share of the pixel group's total biomass) |
-|---|---|---|
-| NA | Non-forest | `pixelGroupMap` is 0 or NA |
-| 1 | Deciduous | deciduous >= 66% |
-| 2 | Coni-deci mix | everything that fits no other class |
-| 3 | Conifer mix | no single group >= 66%, but pine + larch + spruce >= 66% |
-| 4 | Pine | pine >= 66% (jack pine `Pinu_ban` and lodgepole pine `Pinu_con`) |
-| 5 | Larch | larch >= 66% (`Lari_*`) |
-| 6 | Spruce | spruce >= 66% (`Pice_*`) |
+Species codes use case-insensitive literal prefix matching. Each cohort belongs to the first
+matching group: jack pine, larch, spruce, additional conifer, then the residual (everything
+else, including unmatched and missing codes, which need not be true deciduous trees). Biomass is
+summed over all ages by pixel group; the denominator includes all biomass. Rules are tested in
+this order, with no floating-point tolerance:
 
-Deciduous species are `Popu_*` and `Betu_*`. Species in none of the groups (for example fir,
-hemlock or cedar) count toward no group but stay in the biomass total, so a pixel group
-dominated by them falls in class 2. The 66% threshold is the parameter `dominanceThreshold`.
+| Priority | Code / label | Rule |
+|---:|---|---|
+| 1 | 4 / jackpine | Jack pine / total biomass >= 2/3 |
+| 2 | 5 / larch | Larch / total biomass >= 0.75 |
+| 3 | 6 / spruce | Spruce / total biomass >= 2/3 |
+| 4 | 3 / conimix | All four conifer groups / total biomass >= 2/3 |
+| 5 | 1 / deci | 1 - conifer / total > 2/3 |
+| 6 | 2 / mixed | Otherwise, including groups with zero biomass |
+
+Default jack pine is `Pinu_ban`, not all pines. Other pines and fir count as conifers, so a
+stand of 70% larch is conimix. Map IDs without cohorts, and missing cells, are `NA`. A zero ID
+with cohorts is classified. The raster layer and variable name is `standtype`.
+
+## Parameters
+
+| Parameter | Default |
+|---|---|
+| `.plots` | `"screen"` |
+| `.plotInitialTime` | `NA` |
+| `.plotInterval` | `NA` |
+| `WB_HJForestClassesTimeStep` | `NA_real_` |
+| `.saveInitialTime` | `NA` |
+| `.saveInterval` | `NA` |
+| `.useCache` | `FALSE` |
+| `jackPineSp` | `c("Pinu_ban")` |
+| `larchSp` | `c("Lari")` |
+| `spruceSp` | `c("Pice")` |
+| `otherConiferSp` | `c("Abie", "Calc", "Cham", "Juni", "Pinu", "Pseu", "Sequ", "Taxu", "Thuj", "Tsug")` |
+| `writeClassificationCsv` | `FALSE` |
+
+Each species parameter accepts an empty character vector, which matches nothing. Entries cannot
+be missing, blank or whitespace-padded.
+
+## Timing and outputs
+
+Inputs `cohortData` (factor `speciesCode`) and `pixelGroupMap` must be supplied, for example by
+Biomass_core. The module never creates synthetic inputs by itself; use `syntheticForestInputs()`
+explicitly for examples. The output object is `WB_HartJohnstoneForestClassesAI_S5_5_Map`.
+
+An `NA` timestep follows the core succession interval (10 years standalone); an explicit value
+must match the core. Classification runs at priority 8.5 (after growth 6 and summary 8.25) at
+the simulation start and at `start + n * interval`, up to the end. Plots (8.75) and saves (9)
+start only when their initial times are set; their `NA` intervals follow the classification
+interval.
+
+When `writeClassificationCsv = TRUE`, each classification writes
+`WB_HartJohnstoneForestClassesAI_S5_5_<time padded to three digits>.csv` to `outputPath(sim)`,
+with the original's columns, row-name column and integer-truncated percentages. Caching is
+skipped in that case so the file is always written. Saves write
+`WB_HartJohnstoneForestClassesAI_S5_5_Map_time_<time>.tif` with the colour table inside the file.
+Existing outputs are never overwritten.
 
 ## Reusing the classification outside SpaDES
-
-The module only calls two functions that live in the `R` folder:
 
 ```r
 source("R/classifyForestClasses.R")
@@ -42,21 +76,26 @@ forestClasses <- classifyForestClasses(cohortData, pixelGroupMap)
 writeForestClassRaster(forestClasses, "forestClasses.tif")
 ```
 
-`classifyForestClasses()` takes a `cohortData` table (columns `pixelGroup`, `speciesCode`, `B`)
-and a `pixelGroupMap` raster, and returns a raster with class names and a colour table
-attached.
+`writeForestClassRaster()` stores the colour table inside the `.tif`; QGIS only shows the class
+names as labels when the `.aux.xml` sidecar is written (`sidecar = TRUE`).
 
-## Legend in QGIS
+## Differences from the original
 
-`writeForestClassRaster()` stores the colour table inside the `.tif`, so QGIS shows coloured
-classes with no other file. The class names are also stored inside the `.tif`, but QGIS only
-shows them as labels when the `.aux.xml` sidecar is written (`sidecar = TRUE`).
+Output object and file names differ by design. This module refuses to overwrite files, stops
+on malformed input (non-finite or negative biomass, bad IDs) and requires supplied inputs. It
+does not reproduce the original's mutation of the caller's `cohortData`.
 
-## Module use
+## Migration from 0.0.1
 
-Inputs: `cohortData`, `pixelGroupMap` (from Biomass_core). Output:
-`WB_HartJohnstoneForestClassesAIMap`. The map is recomputed every `updateInterval` years
-(default 10, the Biomass_core succession timestep).
+Removed: `dominanceThreshold`, `updateInterval`, `defaultForestSpeciesGroups()` and the `speciesGroups` and `forestClassColours` arguments. Use
+`WB_HJForestClassesTimeStep` and the four species prefix parameters. The output object is now
+`WB_HartJohnstoneForestClassesAI_S5_5_Map` and the layer is `standtype`. Class names and colours
+now match the original. Deciduous is no longer tested first at 66%; see the rules above.
+
+## Tests
+
+Run `source("tests/unitTests.R")` from any directory. `tests/verify-parity.R` is a development
+harness that compares this module with the original and Sol6_1; neither is a runtime dependency.
 
 ## Reference
 

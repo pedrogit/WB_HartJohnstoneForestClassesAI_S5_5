@@ -2,23 +2,24 @@
 #'
 #' Writes the output of [classifyForestClasses()] as an 8-bit GeoTIFF. The colour table is
 #' stored inside the `.tif`, so QGIS shows the classes in their colours without any other
-#' file. The class names are also stored inside the `.tif` as metadata tags named
-#' `class_1` to `class_6`. GDAL and QGIS only use class names as legend labels when the
-#' `.aux.xml` sidecar file is written; set `sidecar = TRUE` for that.
+#' file. The class names are also stored as metadata tags `class_1` to `class_6`. GDAL and
+#' QGIS only use them as legend labels when the `.aux.xml` sidecar is written
+#' (`sidecar = TRUE`).
 #'
 #' @param x a `SpatRaster` returned by [classifyForestClasses()].
 #' @param filename path of the `.tif` to write.
-#' @param sidecar if `TRUE`, also write the `.aux.xml` file that holds the class names
-#'   GDAL uses as category labels. Keep it next to the `.tif`.
-#' @param overwrite overwrite an existing file?
+#' @param sidecar if `TRUE`, also write the `.aux.xml` file with the class names.
+#' @param overwrite overwrite an existing file? Defaults to `FALSE`.
 #'
 #' @return `filename`, invisibly.
 #' @export
-writeForestClassRaster <- function(x, filename, sidecar = FALSE, overwrite = TRUE) {
+writeForestClassRaster <- function(x, filename, sidecar = FALSE, overwrite = FALSE) {
   if (!inherits(x, "SpatRaster")) stop("`x` must be a terra SpatRaster.")
   labs <- terra::levels(x)[[1]]
   if (is.null(labs) || !terra::has.colors(x))
     stop("`x` has no class names or colour table; build it with classifyForestClasses().")
+  if (!overwrite && file.exists(filename))
+    stop("Output already exists; refusing to overwrite: ", filename)
 
   # Tag a copy so the caller's raster keeps its own metadata
   x <- terra::deepcopy(x)
