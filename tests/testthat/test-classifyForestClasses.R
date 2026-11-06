@@ -31,7 +31,7 @@ test_that("synthetic inputs cover the six classes and the result carries its leg
   expect_equal(unname(unlist(coltab(out)[[1]][1:6, 1])), 1:6)
 })
 
-test_that("thresholds are 2/3 for jack pine and spruce, 0.75 for larch, and strict for deciduous", {
+test_that("thresholds are 2/3 for jack pine, spruce and deciduous, and 0.75 for larch, all inclusive", {
   below <- 2/3 - 1e-8; above <- 2/3 + 1e-8
   expect_equal(classifyShares(c("Pinu_ban", "Popu_tre"), c(2/3, 1/3)), 4)
   expect_equal(classifyShares(c("Pinu_ban", "Popu_tre"), c(below, 1 - below)), 2)
@@ -42,6 +42,11 @@ test_that("thresholds are 2/3 for jack pine and spruce, 0.75 for larch, and stri
   expect_equal(classifyShares(c("Popu_tre", "Pice_mar"), c(above, 1 - above)), 1)
   expect_equal(classifyShares(c("Popu_tre", "Pice_mar"), c(.66, .34)), 2)
   expect_equal(classifyShares(c("Popu_tre", "Pice_mar"), c(.67, .33)), 1)
+  # Exactly on the deciduous boundary: the non-conifer share 1 - (1 - 2/3) equals 2/3 in
+  # floating point, and the inclusive rule (Appendix S3: >= 66% broadleaf) gives deci, not mixed.
+  expect_equal(classifyShares(c("Abie_bal", "Popu_tre"), c(1 - 2/3, 2/3)), 1)
+  # Just below the boundary the stand is mixed.
+  expect_equal(classifyShares(c("Abie_bal", "Popu_tre"), c(1 - 2/3 + 1e-8, 2/3 - 1e-8)), 2)
 })
 
 test_that("only Pinu_ban is jack pine by default; other pines and fir are other conifers", {

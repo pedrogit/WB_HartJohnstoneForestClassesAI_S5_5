@@ -11,7 +11,7 @@
 #'   \item `5` larch: larch share >= 0.75.
 #'   \item `6` spruce: spruce share >= 2/3.
 #'   \item `3` conimix: the four conifer groups together >= 2/3.
-#'   \item `1` deci: `1 - conifer share > 2/3`.
+#'   \item `1` deci: `1 - conifer share >= 2/3` (the non-conifer share; inclusive boundary).
 #'   \item `2` mixed: everything else, including groups with no biomass.
 #' }
 #'
@@ -75,11 +75,13 @@ classifyForestClasses <- function(
     larchTotB = sum(B[speciesNb == 2]), spruceTotB = sum(B[speciesNb == 3]),
     otherConiferTotB = sum(B[speciesNb == 4])), by = pixelGroup]
   totals[, coniferTotB := jackPineTotB + larchTotB + spruceTotB + otherConiferTotB]
-  # Expression order and the strict residual boundary are identical to the original.
+  # Expression order and boundaries are identical to the original module. Every dominance
+  # rule is inclusive (>=), including deciduous (the non-conifer share), as in Appendix S3 of
+  # Greuel et al. (2021, after Hart et al. 2019). Before 2026-11-06 deciduous used a strict ">".
   totals[, class := data.table::fcase(
     jackPineTotB / totB >= 2/3, 4L, larchTotB / totB >= 0.75, 5L,
     spruceTotB / totB >= 2/3, 6L, coniferTotB / totB >= 2/3, 3L,
-    1 - coniferTotB / totB > 2/3, 1L, default = 2L)]
+    1 - coniferTotB / totB >= 2/3, 1L, default = 2L)]
   labels <- defaultForestClassLabels()
   if (!is.null(classificationTablePath)) {
     dir.create(dirname(classificationTablePath), recursive = TRUE, showWarnings = FALSE)

@@ -2,7 +2,8 @@
 
 Version **0.1.0** uses the same non-drainage parameters and six-class biomass rules as the
 original `WB_HartJohnstoneForestClasses` module and as `WB_HartJohnstoneForestClassesAI_Sol6_1`.
-It adapts Table 1 of Hart et al. (2019), with biomass replacing basal area and stem density.
+It adapts the stand-type definitions of Appendix S3 of Greuel et al. (2021, doi:10.1002/ecs2.3481),
+which follow Table 1 of Hart et al. (2019), with biomass replacing basal area and stem density.
 Agreement with the original is not ecological validation. No age, drainage or minimum-biomass
 rule is applied, and there is no drainage parameter, input or seventh class.
 
@@ -12,16 +13,23 @@ Species codes use case-insensitive literal prefix matching. Each cohort belongs 
 matching group: jack pine, larch, spruce, additional conifer, then the residual (everything
 else, including unmatched and missing codes, which need not be true deciduous trees). Biomass is
 summed over all ages by pixel group; the denominator includes all biomass. Rules are tested in
-this order, with no floating-point tolerance:
+this order. Every threshold is inclusive (`>=`), and there is no floating-point tolerance:
 
-| Priority | Code / label | Rule |
-|---:|---|---|
-| 1 | 4 / jackpine | Jack pine / total biomass >= 2/3 |
-| 2 | 5 / larch | Larch / total biomass >= 0.75 |
-| 3 | 6 / spruce | Spruce / total biomass >= 2/3 |
-| 4 | 3 / conimix | All four conifer groups / total biomass >= 2/3 |
-| 5 | 1 / deci | 1 - conifer / total > 2/3 |
-| 6 | 2 / mixed | Otherwise, including groups with zero biomass |
+| Priority | Code / label | Rule | Appendix S3 rule |
+|---:|---|---|---|
+| 1 | 4 / jackpine | Jack pine / total biomass >= 2/3 | >= 66% jack pine |
+| 2 | 5 / larch | Larch / total biomass >= 0.75 | > 75% larch |
+| 3 | 6 / spruce | Spruce / total biomass >= 2/3 | >= 66% spruce |
+| 4 | 3 / conimix | All four conifer groups / total biomass >= 2/3 | < 66% spruce or jack pine but >= 2/3 conifer |
+| 5 | 1 / deci | 1 - conifer / total >= 2/3 (the non-conifer share) | >= 66% broadleaf deciduous species |
+| 6 | 2 / mixed | Otherwise (default class), including groups with zero biomass | < 66% broadleaf and < 66% conifer |
+
+Differences from Appendix S3 that remain: thresholds use 2/3 where the appendix writes 66%;
+larch is inclusive at 0.75 where the appendix says "> 75%"; the deciduous class is the share of
+all biomass outside the four conifer groups (which includes unrecognised or missing species
+codes), not the share of broadleaf species; mixed is the default for everything else, so it also
+receives stands that the appendix leaves undefined; and biomass replaces basal area and stem
+density.
 
 Default jack pine is `Pinu_ban`, not all pines. Other pines and fir count as conifers, so a
 stand of 70% larch is conimix. Map IDs without cohorts, and missing cells, are `NA`. A zero ID
